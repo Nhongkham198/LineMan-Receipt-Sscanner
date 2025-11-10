@@ -6,7 +6,7 @@ const processReceiptImage = async (
   mimeType: string,
   posMenu: PosMenuItem[] // Accept the POS menu as context
 ): Promise<Omit<ReceiptData, 'items'> & { items: { name: string; quantity: number; price: number }[] }> => {
-  // FIX: Per coding guidelines, the API key must be obtained from process.env.API_KEY.
+  // Fix: Per coding guidelines, initialize GoogleGenAI directly with process.env.API_KEY.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 
