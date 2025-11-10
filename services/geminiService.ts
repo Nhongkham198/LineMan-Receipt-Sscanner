@@ -1,13 +1,5 @@
-// FIX: Removed 'vite/client' reference which caused a "Cannot find type definition file" error.
-// The manual 'process' declaration below is sufficient for this file's needs.
-
-// Add declarations to resolve TypeScript errors in an environment without Node types
-// or standard NPM module resolution for @google/genai (due to importmap).
-declare var process: {
-  env: {
-    [key: string]: string | undefined;
-  };
-};
+// FIX: Removed vite/client reference which was causing type errors.
+// Per coding guidelines, environment variables are accessed via process.env.
 
 // FIX: Removed manual 'declare module "@google/genai"' block to resolve identifier conflict errors.
 // The import statement below now correctly provides the necessary types.
@@ -19,14 +11,9 @@ const processReceiptImage = async (
   mimeType: string,
   posMenu: PosMenuItem[] // Accept the POS menu as context
 ): Promise<Omit<ReceiptData, 'items'> & { items: { name: string; quantity: number; price: number }[] }> => {
-  // Fix: The API key must be obtained exclusively from process.env.API_KEY.
-  const apiKey = process.env.API_KEY;
-
-  if (!apiKey) {
-    throw new Error("API_KEY environment variable is not set.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  // FIX: Per coding guidelines, initialize GoogleGenAI with process.env.API_KEY directly.
+  // This also resolves issues with Vite-specific environment variables and type definitions.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 
   const imagePart = {
