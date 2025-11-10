@@ -6,11 +6,9 @@ const processReceiptImage = async (
   mimeType: string,
   posMenu: PosMenuItem[] // Accept the POS menu as context
 ): Promise<Omit<ReceiptData, 'items'> & { items: { name: string; quantity: number; price: number }[] }> => {
-  // FIX: Use `process.env.API_KEY` as per guidelines, which also resolves the `import.meta.env` TypeScript error.
-  if (!process.env.API_KEY) {
-    throw new Error("API_KEY is not configured in the environment.");
-  }
+  // FIX: Per coding guidelines, the API key must be obtained from `process.env.API_KEY`. The execution environment is assumed to provide this.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 
   const imagePart = {
     inlineData: {
@@ -38,52 +36,79 @@ const processReceiptImage = async (
       - **QUANTITY**: The quantity is the number at the beginning of the item line, often followed by an 'x' (e.g., "1x", "2x"). Extract this number for the quantity field. If no number is present for an item, assume the quantity is 1.
       - **CRITICAL**: The 'name' for each item MUST be in Thai. The name should NOT include the quantity prefix (e.g., "1x").
       - **VERY IMPORTANT**: The extracted item name should include the main dish and any selected options, for example, "ซุปกิมจิ เผ็ดปกติ". Try your best to match the extracted item name to a combination of a main item and an option from the provided menu list.
-      - Extract the subtotal, delivery fee, any discounts, and the grand total.
-      - Provide the output in a structured JSON format according to the provided schema.
-      - If a value for a nullable field (subtotal, deliveryFee, discount, orderId) is not present on the receipt, use null for that field. The total is mandatory.
-      - Ensure all numerical values are numbers, not strings.
+      - Extract the subtotal, delivery fee, any discounts, and the final total amount.
+      - All monetary values should be returned as numbers (float or integer), not strings.
+      - Structure the output as a JSON object that strictly adheres to the provided schema. Do not add any extra explanations or text outside of the JSON structure.
     `,
   };
 
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
-    contents: { parts: [textPart, imagePart] },
+    contents: { parts: [imagePart, textPart] },
     config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          orderId: { type: Type.STRING, description: "The order ID or reference number, if present on the receipt.", nullable: true },
-          items: {
-            type: Type.ARRAY,
-            description: "List of all items ordered.",
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING, description: "Name of the item, in Thai, including any options (e.g., 'ซุปกิมจิ เผ็ดปกติ'), matched from the provided menu list." },
-                quantity: { type: Type.INTEGER, description: "Quantity of the item." },
-                price: { type: Type.NUMBER, description: "Price of a single item." },
-              },
-              required: ["name", "quantity", "price"],
+        responseMimeType: "application/json",
+        responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+                orderId: {
+                    type: Type.STRING,
+                    description: 'The order ID, e.g., "#LM123456"',
+                    nullable: true,
+                },
+                items: {
+                    type: Type.ARRAY,
+                    description: 'List of items ordered.',
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            name: {
+                                type: Type.STRING,
+                                description: 'The full name of the item in Thai, including any options (e.g., "ซุปกิมจิ เผ็ดปกติ"). Do not include the quantity prefix like "1x".'
+                            },
+                            quantity: {
+                                type: Type.INTEGER,
+                                description: 'The quantity of the item.'
+                            },
+                            price: {
+                                type: Type.NUMBER,
+                                description: 'The total price for this line item (unit price * quantity).'
+                            },
+                        },
+                        required: ['name', 'quantity', 'price'],
+                    },
+                },
+                subtotal: {
+                    type: Type.NUMBER,
+                    description: 'The subtotal before any fees or discounts.',
+                    nullable: true,
+                },
+                deliveryFee: {
+                    type: Type.NUMBER,
+                    description: 'The delivery fee.',
+                    nullable: true,
+                },
+                discount: {
+                    type: Type.NUMBER,
+                    description: 'The total discount amount. If there are multiple discounts, sum them up.',
+                    nullable: true,
+                },
+                total: {
+                    type: Type.NUMBER,
+                    description: 'The final total amount paid.'
+                }
             },
-          },
-          subtotal: { type: Type.NUMBER, description: "The subtotal before fees and discounts.", nullable: true },
-          deliveryFee: { type: Type.NUMBER, description: "The delivery fee.", nullable: true },
-          discount: { type: Type.NUMBER, description: "Total discount applied.", nullable: true },
-          total: { type: Type.NUMBER, description: "The final grand total." },
+            required: ['items', 'total'],
         },
-        required: ["items", "total"],
-      },
-    },
+    }
   });
 
+  const jsonText = response.text.trim();
   try {
-    const jsonString = response.text;
-    const parsedData = JSON.parse(jsonString);
-    return parsedData;
-  } catch (error) {
-    console.error("Failed to parse JSON response:", response.text);
-    throw new Error("Invalid data format received from API.");
+    const parsedData = JSON.parse(jsonText);
+    return parsedData as Omit<ReceiptData, 'items'> & { items: { name: string; quantity: number; price: number }[] };
+  } catch (e) {
+    console.error("Failed to parse JSON response from Gemini:", jsonText);
+    throw new Error("The data received from the AI was not in the expected format.");
   }
 };
 
