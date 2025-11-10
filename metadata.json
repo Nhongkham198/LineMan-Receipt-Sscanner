@@ -1,0 +1,5 @@
+{
+  "name": "LINE MAN Receipt Scanner",
+  "description": "An application to scan LINE MAN receipts from screenshots and extract order details into a structured format, ready for POS integration. Powered by Gemini.",
+  "requestFramePermissions": []
+}
