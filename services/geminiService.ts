@@ -1,8 +1,3 @@
-// FIX: Removed vite/client reference which was causing type errors.
-// Per coding guidelines, environment variables are accessed via process.env.
-
-// FIX: Removed manual 'declare module "@google/genai"' block to resolve identifier conflict errors.
-// The import statement below now correctly provides the necessary types.
 import { GoogleGenAI, Type } from "@google/genai";
 import type { ReceiptData, PosMenuItem } from '../types';
 
@@ -11,8 +6,9 @@ const processReceiptImage = async (
   mimeType: string,
   posMenu: PosMenuItem[] // Accept the POS menu as context
 ): Promise<Omit<ReceiptData, 'items'> & { items: { name: string; quantity: number; price: number }[] }> => {
-  // FIX: Per coding guidelines, initialize GoogleGenAI with process.env.API_KEY directly.
-  // This also resolves issues with Vite-specific environment variables and type definitions.
+  // FIX: Per coding guidelines, initialize GoogleGenAI directly with process.env.API_KEY
+  // and remove Vite-specific environment variable handling. This also removes the need for
+  // /// <reference types="vite/client" /> and resolves the associated TypeScript errors.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 
