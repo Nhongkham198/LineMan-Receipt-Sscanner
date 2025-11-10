@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { ImageUploader } from './components/ImageUploader';
 import { ResultsDisplay } from './components/ResultsDisplay';
 import { Spinner } from './components/Spinner';
@@ -8,8 +9,6 @@ import { posMenuData } from './services/mockMenuData'; // Import the new built-i
 import { findBestMatch } from './lib/stringSimilarity'; // Import the fuzzy matching utility
 import type { ReceiptData, PosMenuItem, MappedLineItem } from './types';
 import { DownloadIcon } from './components/icons/DownloadIcon';
-
-declare var XLSX: any;
 
 const App: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
