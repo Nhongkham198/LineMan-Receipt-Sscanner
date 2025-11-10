@@ -2,7 +2,7 @@ import type { ReceiptData } from '../types';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof TypeError && error.message === 'Failed to fetch') {
-    return 'ไม่สามารถเชื่อมต่อกับเครื่องพิมพ์ได้ ตรวจสอบว่า IP Address ถูกต้อง, เครื่องพิมพ์เปิดอยู่, และอยู่ในเครือข่ายเดียวกัน อาจเกิดจากปัญหา CORS หากเชื่อมต่อจาก HTTPS ไปยัง HTTP';
+    return 'ไม่สามารถเชื่อมต่อกับโปรแกรมตัวกลาง (Bridge) ได้ กรุณาตรวจสอบว่าโปรแกรมทำงานอยู่บนเครื่องของคุณ';
   }
   if (error instanceof Error) {
     return error.message;
@@ -10,40 +10,32 @@ const getErrorMessage = (error: unknown): string => {
   return 'เกิดข้อผิดพลาดที่ไม่คาดคิด';
 };
 
-// Private helper to send text to a printer
-const sendToPrinter = async (text: string, ipAddress: string, port: string): Promise<{ success: boolean; message: string }> => {
-  if (!ipAddress || ipAddress.trim() === '') {
-    const errorMessage = 'กรุณาระบุ IP Address ของเครื่องพิมพ์';
-    console.error(errorMessage);
-    return { success: false, message: errorMessage };
-  }
-  if (!port || port.trim() === '') {
-    const errorMessage = 'กรุณาระบุ Port ของเครื่องพิมพ์';
-    console.error(errorMessage);
-    return { success: false, message: errorMessage };
-  }
+// Private helper to send a print job to the local bridge application
+const sendToLocalBridge = async (payload: object): Promise<{ success: boolean; message: string }> => {
+  const bridgeUrl = 'http://localhost:4000/print'; // Standard endpoint for the local bridge
 
-  const url = `http://${ipAddress.replace(/^(?:https?:\/\/)?/i, "")}:${port}`;
-
-  console.log(`Sending print job to ${url}`);
-  console.log(text);
+  console.log(`Sending print job to local bridge: ${bridgeUrl}`);
+  console.log('Payload:', JSON.stringify(payload, null, 2));
 
   try {
-    await fetch(url, {
+    const response = await fetch(bridgeUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'text/plain; charset=UTF-8',
+        'Content-Type': 'application/json',
       },
-      body: text,
-      mode: 'no-cors', // Important for direct IP printing from browser
+      body: JSON.stringify(payload),
+      mode: 'cors', // We expect the local bridge to handle CORS correctly
     });
+
+    const responseBody = await response.json().catch(() => ({ message: 'Invalid response from bridge' }));
+
+    if (!response.ok) {
+        throw new Error(responseBody.message || `Bridge returned an error: ${response.statusText}`);
+    }
     
-    // Note: With 'no-cors', we can't actually read the response.
-    // We assume success if the request doesn't throw a network error.
-    console.log('Print request sent. Check the printer.');
-    return { success: true, message: 'ส่งคำสั่งพิมพ์แล้ว! กรุณาตรวจสอบที่เครื่องพิมพ์' };
+    return { success: true, message: responseBody.message || 'ส่งคำสั่งพิมพ์ไปที่โปรแกรมตัวกลางสำเร็จ' };
   } catch (error) {
-    console.error('Error sending data to printer:', error);
+    console.error('Error sending data to local bridge:', error);
     return { success: false, message: getErrorMessage(error) };
   }
 };
@@ -139,7 +131,7 @@ export const generateScannedItemsText = (data: ReceiptData, paperWidth: '58' | '
 
 
 /**
- * Sends a pre-generated text string to a thermal printer.
+ * Sends a pre-generated text string to a thermal printer via the local bridge.
  * @param textToPrint The pre-formatted string to be printed.
  * @param ipAddress The IP address of the thermal printer.
  * @param port The port of the thermal printer.
@@ -149,11 +141,16 @@ export const printScannedItemsList = async (
   ipAddress: string,
   port: string
 ): Promise<{ success: boolean; message: string }> => {
-  return sendToPrinter(textToPrint, ipAddress, port);
+  const payload = {
+    ip: ipAddress,
+    port: port,
+    text: textToPrint
+  };
+  return sendToLocalBridge(payload);
 };
 
 /**
- * Sends a test print job to the specified printer to verify the connection.
+ * Sends a test print job to the specified printer via the local bridge to verify the connection.
  * @param ipAddress The IP address of the thermal printer.
  * @param port The port of the thermal printer.
  * @param paperSize The width of the paper for formatting.
@@ -180,5 +177,10 @@ export const testPrinterConnection = async (
   testText += `Time: ${new Date().toLocaleTimeString('th-TH')}\n`;
   testText += '-'.repeat(width) + '\n\n\n\n';
 
-  return sendToPrinter(testText, ipAddress, port);
+  const payload = {
+    ip: ipAddress,
+    port: port,
+    text: testText
+  };
+  return sendToLocalBridge(payload);
 };
