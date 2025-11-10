@@ -6,8 +6,11 @@ const processReceiptImage = async (
   mimeType: string,
   posMenu: PosMenuItem[] // Accept the POS menu as context
 ): Promise<Omit<ReceiptData, 'items'> & { items: { name: string; quantity: number; price: number }[] }> => {
-  // IMPORTANT: Vite requires environment variables exposed to the client to be prefixed with VITE_
-  const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY as string });
+  // FIX: Use `process.env.API_KEY` as per guidelines, which also resolves the `import.meta.env` TypeScript error.
+  if (!process.env.API_KEY) {
+    throw new Error("API_KEY is not configured in the environment.");
+  }
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const imagePart = {
     inlineData: {
