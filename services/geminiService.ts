@@ -6,7 +6,8 @@ const processReceiptImage = async (
   mimeType: string,
   posMenu: PosMenuItem[] // Accept the POS menu as context
 ): Promise<Omit<ReceiptData, 'items'> & { items: { name: string; quantity: number; price: number }[] }> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  // IMPORTANT: Vite requires environment variables exposed to the client to be prefixed with VITE_
+  const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY as string });
 
   const imagePart = {
     inlineData: {
